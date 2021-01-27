@@ -1,13 +1,13 @@
 #!/bin/bash
 #
-################################################################################
-#                                                                              #
-# Multiple Background Download Manager with Curl                               #
-# Copyright (C) 2019 Darth Vader (Zikuvikuzi)                                  #
-#                                                                              #
-# URL:   https://zqwqz.org/profil/vader                                        #
-#                                                                              #
-################################################################################
+##############################################################
+#                                                            #
+#      Multiple Background Download Manager with Curl        #
+#      Copyright (C) 2019 Darth Vader (Zikuvikuzi)           #
+#                                                            #
+#      URL:   https://zqwqz.org/profil/vader                 #
+#                                                            #
+##############################################################
 Version="1.0"
 DefaultNumberOfParts="10"
 function FileSize () {

@@ -1,0 +1,202 @@
+#!/bin/bash
+#
+################################################################################
+#                                                                              #
+# Multiple Background Download Manager with Curl                               #
+# Copyright (C) 2019 Darth Vader (Zikuvikuzi)                                  #
+#                                                                              #
+# URL:   https://zqwqz.org/profil/vader                                        #
+#                                                                              #
+################################################################################
+Version="1.0"
+DefaultNumberOfParts="10"
+function FileSize () {
+  if [ -f "$1" ] ; then
+    SIZE=$(ls -ld "$1" | awk '{print $5}')
+    echo $SIZE
+  else
+    echo 0
+  fi
+}
+function WarningMessage () {
+  echo -e "Warning: $1"
+}
+function ErrorMessage () {
+  echo -e "Error: $1"
+  exit 1
+}
+function OutputUsage () {
+  echo "mCURL - Multiple CURL"
+  echo "Usage: $(basename $0) [options...] [URL]"
+  echo "Options:"
+  echo "  -p/--parts <number>   Set number of download parts (Default: $DefaultNumberOfParts)"
+  echo "  -o/--output <file>    Set output file (Default: extracted from URL)"
+  echo "  -c/--cookie <cookie>    Set output file (Default: extracted from URL)"
+  echo "  -h/--help             Output this message"
+  echo "  -l/--license          Output license McURL comes under"
+  echo "  -V/--version          Output version number"
+  echo
+  exit 1
+}
+while [ "$#" -gt "0" ]; do
+  case "$1" in
+    -p|--parts)
+      NumberOfParts="$2"
+      shift 2
+    ;;
+    -o|--output)
+      FileName="$2"
+      shift 2
+    ;;
+    -c|--cookie)
+      Cookie="$2"
+      shift 2
+    ;;
+    -r|--resume)
+      if [ -e "$2.settings" ] ; then
+        . "$2.settings"
+      elif [ -e "$2" ] ; then
+        . "$2"
+      else
+        ErrorMessage "No download to resume"
+      fi
+
+      URL="$OldURL"
+      shift 2
+    ;;
+    -k|--keep)
+      KeepLogFile="yes"
+      shift 1
+    ;;
+    -f|--force)
+      Force="yes"
+      shift 1
+    ;;
+    -h|--help)
+      OutputUsage
+    ;;
+    -l|--license)
+      # Show license McURL comes under
+      echo
+      echo "mCURL - A shell script to download files in multiple parts via CURL"
+      echo "Copyright (C) 2019 Darth Vader"
+      echo
+      echo "mCURL is free software; you can redistribute it and/or modify"
+      echo "it under the terms of the GNU General Public License as published by"
+      echo "the Free Software Foundation; either version 2 of the License, or"
+      echo "(at your option) any later version."
+      echo
+      echo "McURL is distributed in the hope that it will be useful,"
+      echo "but WITHOUT ANY WARRANTY; without even the implied warranty of"
+      echo "MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the"
+      echo "GNU General Public License for more details."
+      echo
+      echo "You should have received a copy of the GNU General Public License"
+      echo "along with McURL; if not, write to the Free Software"
+      echo "Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA"
+      echo
+
+      exit 0
+    ;;
+    -V|--version)
+      echo "mCURL v$Version"
+      exit 0
+    ;;
+    -v|--verbose)
+      WarningMessage "Verbose mode not implemented yet."
+      BeVerbose="yes"
+      shift 1
+    ;;
+    -*|--*)
+      ErrorMessage "Unknown option $1."
+      exit 1
+    ;;
+    *)
+      URL="$1"
+      break
+    ;;
+  esac
+done
+if [ -z "$URL" ] ; then
+  ErrorMessage "No URL specified. Try --help for help."
+fi
+if [ -z "$NumberOfParts" ] ; then
+  NumberOfParts="$DefaultNumberOfParts"
+fi
+if [ -z "$FileName" ] ; then
+  FileName=$(echo \"$URL\" | sed "s%.*/\([^\/?]*\)\(?.*\)\?$%\1%i")
+fi
+if [ -z "$FileName" ] ; then
+  FileName="index.html"
+fi
+if [ -z "$Cookie" ] ; then
+  Cookie=""
+fi
+if [ -e "$FileName" -a "yes" != "$Force" ] ; then
+  ErrorMessage "File $FileName is already there."
+fi
+curl -sI --connect-timeout 10 --max-time 15 -b "$Cookie" -L "$URL" | grep -i "content-length:" | tr -d " \t" | cut -d ':' -f 2 | tail -1 > "$FileName.header"
+if [ "$?" -ne "0" ] ; then
+  rm -f "$FileName.header"
+  ErrorMessage "Error while retrieving header (CURL return value was $?)."
+fi
+FileSize=$(cat "$FileName.header" | tr -d '[:space:]')
+rm -rf "$FileName.header"
+if [ -z "$FileSize" ]; then
+ ErrorMessage "Yükleme hatası tekrar deneyin"
+fi
+if [ $((FileSize)) -eq 0 ] ; then
+  ErrorMessage "Baglanti problemi!"
+fi
+if [ -e "$FileName.settings" ] ; then
+  . "$FileName.settings"
+
+  if [ $((FileSize)) -ne $((LocalFileSize)) ] ; then
+    ErrorMessage "Local file has different size as on server -> Resuming is not supported."
+  fi
+else
+  echo "OldURL=\"$URL\"" >> "$FileName.settings"
+  echo "NumberOfParts=\"$((NumberOfParts))\"" >> "$FileName.settings"
+  echo "LocalFileSize=\"$((FileSize))\"" >> "$FileName.settings"
+  echo "Force=\"$Force\"" >> "$FileName.settings"
+fi
+RemainingSize=$(( $((FileSize)) % $((NumberOfParts)) ))
+SizePerPart=$((  $(( $((FileSize)) - $((RemainingSize)) )) / $((NumberOfParts)) ))
+Start=0
+End=$(( $((SizePerPart)) + $((RemainingSize)) - 1 ))
+echo -e "> $FileName için multipart yükleme başlıyor..."
+for i in $(seq 1 $NumberOfParts) ; do
+  PartFileSize=$(( End - Start + 1 ))
+  (
+    TempFileSize=$(FileSize "$FileName.$i")
+    while [ $((PartFileSize)) -gt $((TempFileSize)) ] ; do
+      curl --show-error --connect-timeout 10 --max-time 300 -SL -b "$Cookie" --range "$(( $((Start)) + $((TempFileSize)) ))-$((End))" "$URL" >> "$FileName.$i" 2>> ""$FileName.$i.log""
+      TempFileSize=$(FileSize "$FileName.$i")
+    done
+  ) &
+  Start=$(( $((End)) + 1 ))
+  End=$(( $((Start)) + $((SizePerPart)) - 1 ))
+  sleep 0.5
+done
+wait
+if [ ! -f "$FileName.1.log" ]; then
+   rm -f "$FileName.settings"
+   rm -f "$FileName"
+   ErrorMessage "Yükleme hatası tekrar deneyiniz"
+fi
+if [ "yes" = "$Force" ] ; then
+  rm -f "$FileName"
+fi
+for i in $(seq 1 $NumberOfParts) ; do
+  cat "$FileName.$i" >> "$FileName" && rm -rf "$FileName.$i"
+  if [ "yes" = "$KeepLogFile" ] ; then
+    echo -e "\nLog for cURL #$i:\n" >> "$FileName.log"
+    cat -n "$FileName.$i.log" >> "$FileName.log" && rm "$FileName.$i.log"
+  else
+    rm -rf "$FileName.$i.log"
+  fi
+done
+rm -f "$FileName.settings"
+Boyut=$(FileSize "$FileName")
+Oran=$(( $((Boyut)) / (1024 * 1024) ))
+echo "> $FileName $Oran MB başarıyla kayıt edildi"

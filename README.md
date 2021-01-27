@@ -1,5 +1,5 @@
 # Multiple Background Download Manager with Curl (v1.0)
-Bash download script for Mega.nz
+Bash download script for any url
 
 # Install
 $ `curl -o /usr/local/bin/mcurl https://raw.githubusercontent.com/masterofthesith/mcurl/main/mcurl`

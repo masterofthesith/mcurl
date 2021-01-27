@@ -1,4 +1,4 @@
-# MMultiple Background Download Manager with Curl (v1.0)
+# Multiple Background Download Manager with Curl (v1.0)
 Bash download script for Mega.nz
 
 # Install

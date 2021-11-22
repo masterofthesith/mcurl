@@ -134,7 +134,7 @@ fi
 if [ -e "$FileName" -a "yes" != "$Force" ] ; then
   ErrorMessage "File $FileName is already there."
 fi
-curl -sI --connect-timeout 10 --max-time 15 -b "$Cookie" -L "$URL" | grep -i "content-length:" | tr -d " \t" | cut -d ':' -f 2 | tail -1 > "$FileName.header"
+curl -sI --connect-timeout 10 --max-time 15 -4 -b "$Cookie" -L "$URL" | grep -i "content-length:" | tr -d " \t" | cut -d ':' -f 2 | tail -1 > "$FileName.header"
 if [ "$?" -ne "0" ] ; then
   rm -f "$FileName.header"
   ErrorMessage "Error while retrieving header (CURL return value was $?)."
@@ -169,7 +169,7 @@ for i in $(seq 1 $NumberOfParts) ; do
   (
     TempFileSize=$(FileSize "$FileName.$i")
     while [ $((PartFileSize)) -gt $((TempFileSize)) ] ; do
-      curl --show-error --connect-timeout 10 --max-time 300 -SL -b "$Cookie" --range "$(( $((Start)) + $((TempFileSize)) ))-$((End))" "$URL" >> "$FileName.$i" 2>> ""$FileName.$i.log""
+      curl --show-error --connect-timeout 10 -4 --max-time 300 -SL -b "$Cookie" --range "$(( $((Start)) + $((TempFileSize)) ))-$((End))" "$URL" >> "$FileName.$i" 2>> ""$FileName.$i.log""
       TempFileSize=$(FileSize "$FileName.$i")
     done
   ) &
